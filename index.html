@@ -6,7 +6,7 @@
     <title>QR Code Generator</title>
     <!-- Load Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Load new QR Code library: qr-code-styling (Trying jsdelivr CDN instead of cdnjs) -->
+    <!-- Load new QR Code library: qr-code-styling (Using jsdelivr for reliability) -->
     <script src="https://cdn.jsdelivr.net/npm/qr-code-styling@1.6.0/lib/qr-code-styling.min.js"></script>
     <style>
         /* Custom styles for the QR code container */
@@ -38,7 +38,7 @@
         <!-- New: Logo Upload -->
         <div class="mb-4">
             <label for="logo-input" class="block text-sm font-medium text-gray-700 mb-2">
-                Upload Logo (Optional)
+                Upload Logo (Optional - Overrides Default)
             </label>
             <input
                 type="file"
@@ -82,6 +82,9 @@
     </div>
 
     <script>
+        // Define a default logo URL to use if the user doesn't upload one.
+        const DEFAULT_LOGO_URL = 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e0/Google_Chrome_logo_%282011%29.svg/100px-Google_Chrome_logo_%282011%29.svg.png';
+
         // Wait for the entire window to load, including external scripts
         window.onload = () => {
             // Get DOM elements
@@ -165,13 +168,16 @@
                         hideBackgroundDots: true // Hides dots behind the logo
                     }
                 };
+                
+                // CRITICAL FIX: Set the default logo image in the options object.
+                // This will be used unless updated later by the user's file.
+                options.image = DEFAULT_LOGO_URL;
 
                 // Create the QR code instance
-                // This line was causing the error, it should now be fixed
-                // by loading the script correctly.
                 try {
                     // Check if QRCodeStyling is available before using it
                     if (typeof QRCodeStyling === 'undefined') {
+                        // This handles the ReferenceError if the library fails to load via CDN
                         showError("QR code library failed to load. Please check your internet connection and refresh.");
                         console.error("QRCodeStyling is not defined. Library might not have loaded.");
                         placeholderText.classList.remove('hidden');
@@ -189,7 +195,7 @@
                     // If a logo is selected, we need to read it as a Data URL
                     const reader = new FileReader();
                     reader.onload = () => {
-                        // Update the instance with the logo image data
+                        // Update the instance with the user's uploaded logo data
                         qrCodeInstance.update({
                             image: reader.result
                         });
@@ -202,7 +208,8 @@
                     };
                     reader.readAsDataURL(logoFile);
                 } else {
-                    // No logo, just generate the code immediately
+                    // If no logo is uploaded, the default logo is already set in the options, 
+                    // so we just append the generated code.
                     appendAndShowDownload();
                 }
             });
@@ -225,4 +232,3 @@
 
 </body>
 </html>
-
