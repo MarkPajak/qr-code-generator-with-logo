@@ -35,33 +35,67 @@
             ></textarea>
         </div>
 
-        <!-- New: Logo Upload -->
-        <div class="mb-4">
-            <label for="logo-input" class="block text-sm font-medium text-gray-700 mb-2">
-                Upload Logo (Optional - Overrides Default)
-            </label>
-            <input
-                type="file"
-                id="logo-input"
-                accept="image/*"
-                class="w-full text-sm text-gray-500
-                       file:mr-4 file:py-2 file:px-4
-                       file:rounded-lg file:border-0
-                       file:text-sm file:font-semibold
-                       file:bg-blue-50 file:text-blue-700
-                       hover:file:bg-blue-100"
-            />
-        </div>
-
         <!-- Styling Options -->
         <div class="space-y-4 p-4 border border-gray-200 rounded-lg bg-gray-50 mb-6">
             <h3 class="text-lg font-semibold text-gray-700 mb-3">Styling Options</h3>
+
+            <!-- Logo Options (NEW SECTION) -->
+            <div class="space-y-3 pt-4 border-t border-gray-200">
+                <h4 class="font-medium text-base text-gray-700 border-b pb-2">Logo (Center Image)</h4>
+
+                <!-- Logo Size Input (NEW) -->
+                <div>
+                    <label for="logo-size-input" class="block text-xs font-medium text-gray-600 mb-1">
+                        Logo Size (0.2 - 0.7)
+                    </label>
+                    <input
+                        type="number"
+                        id="logo-size-input"
+                        min="0.2"
+                        max="0.7"
+                        step="0.05"
+                        value="0.4"
+                        class="w-full p-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200"
+                    />
+                </div>
+
+                <!-- Logo Keyword Input -->
+                <div>
+                    <label for="logo-keyword-input" class="block text-xs font-medium text-gray-600 mb-1">
+                        Generate Simple Black Logo (e.g., "star", "home", "phone")
+                    </label>
+                    <input
+                        type="text"
+                        id="logo-keyword-input"
+                        class="w-full p-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200"
+                        placeholder="Keyword for a simple logo (Optional)"
+                    />
+                </div>
+                
+                <!-- Logo Upload (EXISTING, moved) -->
+                <div>
+                    <label for="logo-input" class="block text-xs font-medium text-gray-600 mb-1">
+                        --- OR --- Upload Your Own Image (Overrides Keyword)
+                    </label>
+                    <input
+                        type="file"
+                        id="logo-input"
+                        accept="image/*"
+                        class="w-full text-sm text-gray-500
+                               file:mr-4 file:py-2 file:px-4
+                               file:rounded-lg file:border-0
+                               file:text-sm file:font-semibold
+                               file:bg-blue-50 file:text-blue-700
+                               hover:file:bg-blue-100"
+                    />
+                </div>
+            </div>
 
             <!-- Dots & Corners Styling -->
             <div class="space-y-4">
                 <h4 class="font-medium text-base text-gray-700 border-b pb-2">Foreground & Correction</h4>
                 
-                <!-- Error Correction Level Dropdown (NEW) -->
+                <!-- Error Correction Level Dropdown -->
                 <div>
                     <label for="ecl-input" class="block text-xs font-medium text-gray-600 mb-1">
                         Error Correction Level (Lower = Less Dots)
@@ -156,6 +190,11 @@
                 </div>
             </div>
         </div>
+        
+        <!-- Loading Indicator (NEW) -->
+        <div id="loading-indicator" class="hidden text-center p-3 mb-4 bg-yellow-100 border border-yellow-400 text-yellow-800 rounded-lg font-semibold">
+            Generating Logo, please wait...
+        </div>
 
         <!-- Error message box -->
         <div id="error-box" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg mb-4" role="alert">
@@ -196,6 +235,9 @@
             const downloadBtn = document.getElementById('download-btn');
             const textInput = document.getElementById('text-input');
             const logoInput = document.getElementById('logo-input');
+            const logoKeywordInput = document.getElementById('logo-keyword-input');
+            const logoSizeInput = document.getElementById('logo-size-input'); // NEW
+            const loadingIndicator = document.getElementById('loading-indicator');
             const qrcodeDiv = document.getElementById('qrcode');
             const placeholderText = document.getElementById('placeholder-text');
             const errorBox = document.getElementById('error-box');
@@ -205,7 +247,7 @@
             const dotsTypeInput = document.getElementById('dots-type');
             const cornersTypeInput = document.getElementById('corners-type');
             const dotsColorInput = document.getElementById('dots-color');
-            const eclInput = document.getElementById('ecl-input'); // NEW ECL INPUT
+            const eclInput = document.getElementById('ecl-input');
             
             // Background and Gradient controls
             const backgroundColorInput = document.getElementById('background-color');
@@ -218,18 +260,34 @@
 
             let qrCodeInstance = null; // This will hold the QRCodeStyling instance
 
-            // Function to show an error message
+            // API Configuration for Imagen generation
+            const API_KEY = ""; // Placeholder for Canvas environment
+            const IMAGEN_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${API_KEY}`;
+
+
+            // --- Utility Functions ---
+
             function showError(message) {
                 errorMessage.textContent = message;
                 errorBox.classList.remove('hidden');
             }
 
-            // Function to hide the error message
             function hideError() {
                 errorBox.classList.add('hidden');
             }
+            
+            function showLoading() {
+                loadingIndicator.classList.remove('hidden');
+                generateBtn.disabled = true;
+                generateBtn.textContent = 'Generating...';
+            }
 
-            // Helper function to append QR code and show download button
+            function hideLoading() {
+                loadingIndicator.classList.add('hidden');
+                generateBtn.disabled = false;
+                generateBtn.textContent = 'Generate QR Code';
+            }
+
             function appendAndShowDownload() {
                 try {
                     // Append the QR code (as a canvas) to our div
@@ -242,6 +300,51 @@
                     placeholderText.classList.remove('hidden');
                 }
             }
+            
+            // Generate logo using the Imagen API
+            async function generateLogo(keyword) {
+                // Highly constrained prompt for simple black and white icon
+                const prompt = `A highly minimalist, centered, solid black icon with a transparent background representing a ${keyword}. The icon must be simple, easily recognizable, and suitable for a small QR code logo. Aspect ratio 1:1.`;
+                const payload = { 
+                    instances: [{ prompt: prompt }], 
+                    parameters: { "sampleCount": 1, "aspectRatio": "1:1", "outputMimeType": "image/png" } 
+                };
+
+                // Simple retry mechanism with exponential backoff
+                for (let i = 0; i < 3; i++) {
+                    try {
+                        const response = await fetch(IMAGEN_API_URL, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+
+                        if (!response.ok) {
+                            throw new Error(`API response status: ${response.status}`);
+                        }
+
+                        const result = await response.json();
+                        const base64Data = result?.predictions?.[0]?.bytesBase64Encoded;
+
+                        if (base64Data) {
+                            // Return image data URL
+                            return `data:image/png;base64,${base64Data}`;
+                        } else {
+                            throw new Error("No image data received from API.");
+                        }
+                    } catch (error) {
+                        console.error(`Attempt ${i + 1} failed:`, error);
+                        if (i < 2) {
+                            await new Promise(resolve => setTimeout(resolve, Math.pow(2, i) * 1000));
+                        } else {
+                            throw new Error("Failed to generate logo after multiple retries.");
+                        }
+                    }
+                }
+            }
+
+
+            // --- Event Listeners ---
 
             // Toggle visibility of gradient inputs based on gradient type
             gradientTypeInput.addEventListener('change', (e) => {
@@ -261,15 +364,18 @@
 
 
             // Generate QR Code
-            generateBtn.addEventListener('click', () => {
+            generateBtn.addEventListener('click', async () => {
                 const text = textInput.value.trim();
                 const logoFile = logoInput.files[0];
+                const logoKeyword = logoKeywordInput.value.trim();
+                let imageSource = DEFAULT_LOGO_URL; 
                 
                 // Get current styling values
                 const selectedDotsType = dotsTypeInput.value;
                 const selectedCornersType = cornersTypeInput.value;
                 const selectedDotsColor = dotsColorInput.value;
-                const selectedECL = eclInput.value; // Get the selected ECL
+                const selectedECL = eclInput.value; 
+                const logoSize = parseFloat(logoSizeInput.value) || 0.4; // NEW: Get and parse the logo size
                 
                 // Get current background styling values
                 const selectedBackgroundColor = backgroundColorInput.value;
@@ -293,6 +399,38 @@
                 // Hide placeholder
                 placeholderText.classList.add('hidden');
                 
+                showLoading(); // Start loading indicator
+
+                // 1. Prioritize uploaded file
+                if (logoFile) {
+                    try {
+                        imageSource = await new Promise((resolve, reject) => {
+                            const reader = new FileReader();
+                            reader.onload = () => resolve(reader.result);
+                            reader.onerror = () => reject('Failed to read logo file.');
+                            reader.readAsDataURL(logoFile);
+                        });
+                    } catch (e) {
+                        hideLoading();
+                        showError(e);
+                        placeholderText.classList.remove('hidden');
+                        return;
+                    }
+                } 
+                // 2. Fallback to generated keyword logo
+                else if (logoKeyword) {
+                    try {
+                        imageSource = await generateLogo(logoKeyword);
+                    } catch (e) {
+                        // If generation fails, fail gracefully but continue with default logo
+                        showError(`Logo generation failed: ${e.message}. Using default logo instead.`);
+                        imageSource = DEFAULT_LOGO_URL; 
+                    }
+                } 
+                // 3. Fallback to hardcoded default logo
+                // (imageSource remains DEFAULT_LOGO_URL)
+
+
                 // --- Background Options Logic ---
                 let backgroundOptions = {
                     color: selectedBackgroundColor,
@@ -311,7 +449,6 @@
                     };
                 }
 
-
                 // --- Full Options Object ---
                 const options = {
                     width: 256,
@@ -321,7 +458,7 @@
                     qrOptions: {
                         typeNumber: 0,
                         mode: 'Byte',
-                        errorCorrectionLevel: selectedECL // Use the selected ECL
+                        errorCorrectionLevel: selectedECL 
                     },
                     dotsOptions: {
                         color: selectedDotsColor, 
@@ -335,16 +472,16 @@
                         color: selectedDotsColor, 
                     },
                     backgroundOptions: backgroundOptions,
+                    image: imageSource, // Use the determined image source
                     imageOptions: {
                         crossOrigin: 'anonymous',
                         margin: 4,      
-                        imageSize: 0.4, 
+                        imageSize: logoSize, // Using the new dynamic size
                         hideBackgroundDots: true 
                     }
                 };
                 
-                // Set the default logo image
-                options.image = DEFAULT_LOGO_URL;
+                hideLoading(); // Hide loading indicator before generating QR code
 
                 // Create the QR code instance
                 try {
@@ -355,30 +492,12 @@
                         return;
                     }
                     qrCodeInstance = new QRCodeStyling(options);
+                    appendAndShowDownload();
                 } catch (e) {
                     console.error("Failed to initialize QRCodeStyling:", e);
                     showError("Failed to load QR code library. Please refresh the page.");
                     placeholderText.classList.remove('hidden');
                     return;
-                }
-                
-                if (logoFile) {
-                    // If a logo is selected, read it and update the instance
-                    const reader = new FileReader();
-                    reader.onload = () => {
-                        qrCodeInstance.update({
-                            image: reader.result
-                        });
-                        appendAndShowDownload();
-                    };
-                    reader.onerror = () => {
-                        showError('Failed to read logo file.');
-                        placeholderText.classList.remove('hidden');
-                    };
-                    reader.readAsDataURL(logoFile);
-                } else {
-                    // No logo upload, use default image, and generate immediately
-                    appendAndShowDownload();
                 }
             });
 
@@ -389,299 +508,6 @@
                     return;
                 }
 
-                qrCodeInstance.download({
-                    name: 'qrcode-with-logo',
-                    extension: 'png'
-                });
-            });
-        };
-    </script>
-
-</body>
-</html>
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>QR Code Generator</title>
-    <!-- Load Tailwind CSS for styling -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Load new QR Code library: qr-code-styling (Using jsdelivr for reliability) -->
-    <script src="https://cdn.jsdelivr.net/npm/qr-code-styling@1.6.0/lib/qr-code-styling.min.js"></script>
-    <style>
-        /* Custom styles for the QR code container */
-        #qrcode canvas {
-            margin: auto; /* Center the generated canvas */
-        }
-    </style>
-</head>
-<body class="bg-gray-100 flex items-center justify-center min-h-screen font-sans py-12">
-
-    <div class="bg-white p-8 rounded-lg shadow-lg w-full max-w-md">
-        <h1 class="text-3xl font-bold text-center text-gray-800 mb-6">
-            QR Code Generator
-        </h1>
-
-        <!-- Input field -->
-        <div class="mb-4">
-            <label for="text-input" class="block text-sm font-medium text-gray-700 mb-2">
-                Enter text or URL
-            </label>
-            <textarea
-                id="text-input"
-                rows="4"
-                class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200"
-                placeholder="e.g., https://www.google.com"
-            ></textarea>
-        </div>
-
-        <!-- New: Logo Upload -->
-        <div class="mb-4">
-            <label for="logo-input" class="block text-sm font-medium text-gray-700 mb-2">
-                Upload Logo (Optional - Overrides Default)
-            </label>
-            <input
-                type="file"
-                id="logo-input"
-                accept="image/*"
-                class="w-full text-sm text-gray-500
-                       file:mr-4 file:py-2 file:px-4
-                       file:rounded-lg file:border-0
-                       file:text-sm file:font-semibold
-                       file:bg-blue-50 file:text-blue-700
-                       hover:file:bg-blue-100"
-            />
-        </div>
-
-        <!-- Styling Options -->
-        <div class="space-y-4 p-4 border border-gray-200 rounded-lg bg-gray-50 mb-6">
-            <h3 class="text-lg font-semibold text-gray-700">Styling Options</h3>
-
-            <div class="flex flex-wrap -mx-2">
-                <!-- Dots Type Dropdown -->
-                <div class="w-full sm:w-1/2 px-2 mb-4 sm:mb-0">
-                    <label for="dots-type" class="block text-xs font-medium text-gray-600 mb-1">
-                        Dots Style
-                    </label>
-                    <select id="dots-type" class="w-full p-2 border border-gray-300 rounded-lg text-sm focus:ring-blue-500 focus:border-blue-500">
-                        <option value="rounded">Rounded (Default)</option>
-                        <option value="square">Square</option>
-                        <option value="extra-rounded">Extra Rounded</option>
-                        <option value="dots">Dots</option>
-                        <option value="classy">Classy</option>
-                        <option value="classy-rounded">Classy Rounded</option>
-                    </select>
-                </div>
-
-                <!-- Corners Type Dropdown -->
-                <div class="w-full sm:w-1/2 px-2">
-                    <label for="corners-type" class="block text-xs font-medium text-gray-600 mb-1">
-                        Corners Style
-                    </label>
-                    <select id="corners-type" class="w-full p-2 border border-gray-300 rounded-lg text-sm focus:ring-blue-500 focus:border-blue-500">
-                        <option value="square">Square (Default)</option>
-                        <option value="dot">Dot</option>
-                        <option value="extra-rounded">Extra Rounded</option>
-                    </select>
-                </div>
-            </div>
-            
-            <!-- Dots Color Picker -->
-            <div>
-                <label for="dots-color" class="block text-xs font-medium text-gray-600 mb-1">
-                    Dots Color
-                </label>
-                <input type="color" id="dots-color" value="#000000" class="w-full h-10 p-1 border border-gray-300 rounded-lg cursor-pointer">
-            </div>
-        </div>
-
-        <!-- Error message box -->
-        <div id="error-box" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg mb-4" role="alert">
-            <span class="block sm:inline" id="error-message"></span>
-        </div>
-
-        <!-- Generate Button -->
-        <button id="generate-btn" class="w-full bg-blue-600 text-white p-3 rounded-lg font-semibold hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 transition duration-200">
-            Generate QR Code
-        </button>
-
-        <!-- QR Code Display Area -->
-        <div 
-            id="qrcode-container" 
-            class="mt-6 border-2 border-dashed border-gray-300 rounded-lg min-h-[280px] w-[280px] mx-auto p-4 flex items-center justify-center"
-        >
-            <!-- The qr-code-styling library will target the div below -->
-            <div id="qrcode"></div>
-            <span id="placeholder-text" class="text-gray-400 text-center">
-                Your QR code will appear here
-            </span>
-        </div>
-
-        <!-- Download Button (hidden initially) -->
-        <button id="download-btn" class="hidden w-full bg-green-600 text-white p-3 rounded-lg font-semibold hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50 transition duration-200 mt-4">
-            Download QR Code
-        </button>
-    </div>
-
-    <script>
-        // Define a default logo URL to use if the user doesn't upload one.
-        const DEFAULT_LOGO_URL = 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e0/Google_Chrome_logo_%282011%29.svg/100px-Google_Chrome_logo_%282011%29.svg.png';
-
-        // Wait for the entire window to load, including external scripts
-        window.onload = () => {
-            // Get DOM elements
-            const generateBtn = document.getElementById('generate-btn');
-            const downloadBtn = document.getElementById('download-btn');
-            const textInput = document.getElementById('text-input');
-            const logoInput = document.getElementById('logo-input');
-            const qrcodeDiv = document.getElementById('qrcode');
-            const placeholderText = document.getElementById('placeholder-text');
-            const errorBox = document.getElementById('error-box');
-            const errorMessage = document.getElementById('error-message');
-            
-            // New: Get references to styling controls
-            const dotsTypeInput = document.getElementById('dots-type');
-            const cornersTypeInput = document.getElementById('corners-type');
-            const dotsColorInput = document.getElementById('dots-color');
-
-            let qrCodeInstance = null; // This will hold the QRCodeStyling instance
-
-            // Function to show an error message
-            function showError(message) {
-                errorMessage.textContent = message;
-                errorBox.classList.remove('hidden');
-            }
-
-            // Function to hide the error message
-            function hideError() {
-                errorBox.classList.add('hidden');
-            }
-
-            // Helper function to append QR code and show download button
-            function appendAndShowDownload() {
-                try {
-                    // Append the QR code (as a canvas) to our div
-                    qrCodeInstance.append(qrcodeDiv);
-                    // Show the download button
-                    downloadBtn.classList.remove('hidden');
-                } catch (error) {
-                    console.error('QR Code generation failed:', error);
-                    showError('An error occurred while generating the QR code.');
-                    placeholderText.classList.remove('hidden');
-                }
-            }
-
-            // Generate QR Code
-            generateBtn.addEventListener('click', () => {
-                const text = textInput.value.trim();
-                const logoFile = logoInput.files[0];
-                
-                // New: Get current styling values
-                const selectedDotsType = dotsTypeInput.value;
-                const selectedCornersType = cornersTypeInput.value;
-                const selectedDotsColor = dotsColorInput.value;
-
-                // Clear previous QR code and hide download button
-                qrcodeDiv.innerHTML = '';
-                downloadBtn.classList.add('hidden');
-                hideError();
-
-                if (!text) {
-                    showError('Please enter some text or a URL.');
-                    placeholderText.classList.remove('hidden');
-                    return;
-                }
-
-                // Hide placeholder
-                placeholderText.classList.add('hidden');
-
-                // --- Base options for the new library ---
-                const options = {
-                    width: 256,
-                    height: 256,
-                    data: text,
-                    margin: 0,
-                    qrOptions: {
-                        typeNumber: 0,
-                        mode: 'Byte',
-                        errorCorrectionLevel: 'H' // High correction level, good for logos
-                    },
-                    dotsOptions: {
-                        color: selectedDotsColor, // Apply selected color
-                        type: selectedDotsType    // Apply selected type
-                    },
-                    cornersSquareOptions: {
-                        color: selectedDotsColor, // Match corner square color to dots color
-                        type: selectedCornersType // Apply selected type
-                    },
-                    cornersDotOptions: {
-                        color: selectedDotsColor, // Match corner dot color to dots color
-                    },
-                    backgroundOptions: {
-                        color: '#ffffff',
-                    },
-                    imageOptions: {
-                        crossOrigin: 'anonymous',
-                        margin: 4,      // Margin around the logo
-                        imageSize: 0.4, // Logo size (40% of QR code)
-                        hideBackgroundDots: true // Hides dots behind the logo
-                    }
-                };
-                
-                // CRITICAL FIX: Set the default logo image in the options object.
-                // This will be used unless updated later by the user's file.
-                options.image = DEFAULT_LOGO_URL;
-
-                // Create the QR code instance
-                try {
-                    // Check if QRCodeStyling is available before using it
-                    if (typeof QRCodeStyling === 'undefined') {
-                        // This handles the ReferenceError if the library fails to load via CDN
-                        showError("QR code library failed to load. Please check your internet connection and refresh.");
-                        console.error("QRCodeStyling is not defined. Library might not have loaded.");
-                        placeholderText.classList.remove('hidden');
-                        return;
-                    }
-                    qrCodeInstance = new QRCodeStyling(options);
-                } catch (e) {
-                    console.error("Failed to initialize QRCodeStyling:", e);
-                    showError("Failed to load QR code library. Please refresh the page.");
-                    placeholderText.classList.remove('hidden');
-                    return;
-                }
-                
-                if (logoFile) {
-                    // If a logo is selected, we need to read it as a Data URL
-                    const reader = new FileReader();
-                    reader.onload = () => {
-                        // Update the instance with the user's uploaded logo data
-                        qrCodeInstance.update({
-                            image: reader.result
-                        });
-                        // Now generate and show the QR code
-                        appendAndShowDownload();
-                    };
-                    reader.onerror = () => {
-                        showError('Failed to read logo file.');
-                        placeholderText.classList.remove('hidden');
-                    };
-                    reader.readAsDataURL(logoFile);
-                } else {
-                    // If no logo is uploaded, the default logo is already set in the options, 
-                    // so we just append the generated code.
-                    appendAndShowDownload();
-                }
-            });
-
-            // Download QR Code (much simpler with this library)
-            downloadBtn.addEventListener('click', () => {
-                if (!qrCodeInstance) {
-                    showError('No QR code instance found to download.');
-                    return;
-                }
-
-                // The library has its own download method
                 qrCodeInstance.download({
                     name: 'qrcode-with-logo',
                     extension: 'png'
