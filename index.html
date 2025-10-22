@@ -53,6 +53,48 @@
             />
         </div>
 
+        <!-- Styling Options -->
+        <div class="space-y-4 p-4 border border-gray-200 rounded-lg bg-gray-50 mb-6">
+            <h3 class="text-lg font-semibold text-gray-700">Styling Options</h3>
+
+            <div class="flex flex-wrap -mx-2">
+                <!-- Dots Type Dropdown -->
+                <div class="w-full sm:w-1/2 px-2 mb-4 sm:mb-0">
+                    <label for="dots-type" class="block text-xs font-medium text-gray-600 mb-1">
+                        Dots Style
+                    </label>
+                    <select id="dots-type" class="w-full p-2 border border-gray-300 rounded-lg text-sm focus:ring-blue-500 focus:border-blue-500">
+                        <option value="rounded">Rounded (Default)</option>
+                        <option value="square">Square</option>
+                        <option value="extra-rounded">Extra Rounded</option>
+                        <option value="dots">Dots</option>
+                        <option value="classy">Classy</option>
+                        <option value="classy-rounded">Classy Rounded</option>
+                    </select>
+                </div>
+
+                <!-- Corners Type Dropdown -->
+                <div class="w-full sm:w-1/2 px-2">
+                    <label for="corners-type" class="block text-xs font-medium text-gray-600 mb-1">
+                        Corners Style
+                    </label>
+                    <select id="corners-type" class="w-full p-2 border border-gray-300 rounded-lg text-sm focus:ring-blue-500 focus:border-blue-500">
+                        <option value="square">Square (Default)</option>
+                        <option value="dot">Dot</option>
+                        <option value="extra-rounded">Extra Rounded</option>
+                    </select>
+                </div>
+            </div>
+            
+            <!-- Dots Color Picker -->
+            <div>
+                <label for="dots-color" class="block text-xs font-medium text-gray-600 mb-1">
+                    Dots Color
+                </label>
+                <input type="color" id="dots-color" value="#000000" class="w-full h-10 p-1 border border-gray-300 rounded-lg cursor-pointer">
+            </div>
+        </div>
+
         <!-- Error message box -->
         <div id="error-box" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg mb-4" role="alert">
             <span class="block sm:inline" id="error-message"></span>
@@ -96,6 +138,11 @@
             const placeholderText = document.getElementById('placeholder-text');
             const errorBox = document.getElementById('error-box');
             const errorMessage = document.getElementById('error-message');
+            
+            // New: Get references to styling controls
+            const dotsTypeInput = document.getElementById('dots-type');
+            const cornersTypeInput = document.getElementById('corners-type');
+            const dotsColorInput = document.getElementById('dots-color');
 
             let qrCodeInstance = null; // This will hold the QRCodeStyling instance
 
@@ -128,6 +175,11 @@
             generateBtn.addEventListener('click', () => {
                 const text = textInput.value.trim();
                 const logoFile = logoInput.files[0];
+                
+                // New: Get current styling values
+                const selectedDotsType = dotsTypeInput.value;
+                const selectedCornersType = cornersTypeInput.value;
+                const selectedDotsColor = dotsColorInput.value;
 
                 // Clear previous QR code and hide download button
                 qrcodeDiv.innerHTML = '';
@@ -155,8 +207,15 @@
                         errorCorrectionLevel: 'H' // High correction level, good for logos
                     },
                     dotsOptions: {
-                        color: '#000000',
-                        type: 'rounded'
+                        color: selectedDotsColor, // Apply selected color
+                        type: selectedDotsType    // Apply selected type
+                    },
+                    cornersSquareOptions: {
+                        color: selectedDotsColor, // Match corner square color to dots color
+                        type: selectedCornersType // Apply selected type
+                    },
+                    cornersDotOptions: {
+                        color: selectedDotsColor, // Match corner dot color to dots color
                     },
                     backgroundOptions: {
                         color: '#ffffff',
